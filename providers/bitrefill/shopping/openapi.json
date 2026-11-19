@@ -1,0 +1,737 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Bitrefill x402",
+    "description": "Buy gift cards, eSIMs, mobile top-ups and prepaid cards with USDC via x402. 10,000+ brands across 180+ countries. No API keys or Bitrefill account required — wallet payment and optional SIWX sign-in only.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Bitrefill",
+      "email": "miguelmorales@bitrefill.com"
+    },
+    "x-guidance": "Agent checkout flow: search (gift-cards/esims/topups) → GET /x402/products/detail?slug=… → POST /x402/invoice/create with items → POST /x402/invoice/pay with invoice_id → GET /x402/invoice/status?invoice_id=… (SIWX with the paying wallet to retrieve codes). Pay each micro-fee via x402 (PAYMENT-SIGNATURE header) or mint a session at POST /x402/connect (SIGN-IN-WITH-X) and send X-Access-Token on later calls. Full guide: bitrefill.com/agents/SKILL.md"
+  },
+  "servers": [
+    {
+      "url": "https://api.bitrefill.com"
+    }
+  ],
+  "tags": [
+    {
+      "name": "discovery",
+      "description": "Search and browse the catalog (micro-fee per call)."
+    },
+    {
+      "name": "checkout",
+      "description": "Product details and invoice creation."
+    },
+    {
+      "name": "payments",
+      "description": "Invoice payment and status."
+    },
+    {
+      "name": "account",
+      "description": "Orders and eSIMs for the paying wallet (SIWX)."
+    },
+    {
+      "name": "feedback",
+      "description": "Notes for the Bitrefill team (free)."
+    }
+  ],
+  "paths": {
+    "/x402/checkout/info": {
+      "get": {
+        "operationId": "getCheckoutInfo",
+        "summary": "x402 storefront catalog and route map",
+        "description": "Entry point listing supported networks, all x402 routes, and wallet-persistence rules.",
+        "tags": [
+          "discovery"
+        ],
+        "parameters": [
+          {
+            "name": "PAYMENT-SIGNATURE",
+            "in": "header",
+            "required": false,
+            "description": "x402 payment payload (base64). Required to settle a 402 challenge. v1 clients may send x-payment instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.001"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Route catalog with next_step pointing at gift-card search."
+          },
+          "402": {
+            "description": "Payment Required — x402 payment requirements in the PAYMENT-REQUIRED response header (and mirrored in the JSON body)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/gift-cards/search": {
+      "get": {
+        "operationId": "searchGiftCards",
+        "summary": "Search gift card products",
+        "description": "Search gift cards by query and optional country. Returns product slugs for product detail.",
+        "tags": [
+          "discovery"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search query. Defaults to * (browse) when omitted.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "description": "ISO 3166-1 alpha-2 country code to narrow results (e.g. US).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PAYMENT-SIGNATURE",
+            "in": "header",
+            "required": false,
+            "description": "x402 payment payload (base64). Required to settle a 402 challenge. v1 clients may send x-payment instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.002"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Matching products with next_step to GET /x402/products/detail."
+          },
+          "402": {
+            "description": "Payment Required — x402 payment requirements in the PAYMENT-REQUIRED response header (and mirrored in the JSON body)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/esims/search": {
+      "get": {
+        "operationId": "searchEsims",
+        "summary": "Search eSIM data plans by name or country",
+        "description": "Search eSIM products by query and optional region/country.",
+        "tags": [
+          "discovery"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search query. Defaults to * (browse) when omitted.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "description": "ISO 3166-1 alpha-2 country code to narrow results (e.g. US).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PAYMENT-SIGNATURE",
+            "in": "header",
+            "required": false,
+            "description": "x402 payment payload (base64). Required to settle a 402 challenge. v1 clients may send x-payment instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.002"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Matching eSIM products with next_step to GET /x402/products/detail."
+          },
+          "402": {
+            "description": "Payment Required — x402 payment requirements in the PAYMENT-REQUIRED response header (and mirrored in the JSON body)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/topups/search": {
+      "get": {
+        "operationId": "searchTopups",
+        "summary": "Search mobile top-up operators",
+        "description": "Search prepaid mobile refill operators by query and optional country.",
+        "tags": [
+          "discovery"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search query. Defaults to * (browse) when omitted.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "description": "ISO 3166-1 alpha-2 country code to narrow results (e.g. US).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PAYMENT-SIGNATURE",
+            "in": "header",
+            "required": false,
+            "description": "x402 payment payload (base64). Required to settle a 402 challenge. v1 clients may send x-payment instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.002"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Matching top-up products with next_step to GET /x402/products/detail."
+          },
+          "402": {
+            "description": "Payment Required — x402 payment requirements in the PAYMENT-REQUIRED response header (and mirrored in the JSON body)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/products/detail": {
+      "get": {
+        "operationId": "getProductDetails",
+        "summary": "Product details and purchasable packages",
+        "description": "Fetch packages, recipient requirements, and a suggested line item for invoice creation.",
+        "tags": [
+          "checkout"
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "query",
+            "required": true,
+            "description": "Product slug from search results (e.g. amazon-us).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PAYMENT-SIGNATURE",
+            "in": "header",
+            "required": false,
+            "description": "x402 payment payload (base64). Required to settle a 402 challenge. v1 clients may send x-payment instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.001"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Product metadata with next_step to POST /x402/invoice/create."
+          },
+          "400": {
+            "description": "Missing slug."
+          },
+          "402": {
+            "description": "Payment Required — x402 payment requirements in the PAYMENT-REQUIRED response header (and mirrored in the JSON body)."
+          },
+          "404": {
+            "description": "Product not found (may include suggestions)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/invoice/create": {
+      "post": {
+        "operationId": "createInvoice",
+        "summary": "Create a price-locked invoice",
+        "description": "Quote cart items and lock the USDC price. Requires a resolved paying wallet (from the create micro-fee payer, SIWX, or X-Access-Token).",
+        "tags": [
+          "checkout"
+        ],
+        "parameters": [
+          {
+            "name": "PAYMENT-SIGNATURE",
+            "in": "header",
+            "required": false,
+            "description": "x402 payment payload (base64). Required to settle a 402 challenge. v1 clients may send x-payment instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SIGN-IN-WITH-X",
+            "in": "header",
+            "required": false,
+            "description": "Base64 JSON of decomposed SIWE fields (domain, address, uri, version, chainId, type, nonce, issuedAt, signature). Required on SIWX-only routes when no X-Access-Token is present.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Bitrefill-Affiliate-Id",
+            "in": "header",
+            "required": false,
+            "description": "Public affiliate code (6-16 alphanumeric characters, case-sensitive) to credit for this purchase — the same code MCP accepts as ?ref=, never a user id. An unknown or malformed code is ignored rather than rejected.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.002"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 15,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "product_id": {
+                          "type": "string",
+                          "description": "Product slug."
+                        },
+                        "package_value": {
+                          "type": "string",
+                          "description": "Package denomination from product detail."
+                        },
+                        "refill_input": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "description": "Recipient (phone, email, etc.) when the product requires it."
+                        }
+                      },
+                      "required": [
+                        "product_id",
+                        "package_value"
+                      ]
+                    },
+                    "description": "Products to buy, 1 to 15 items, each with product_id and package_value."
+                  }
+                },
+                "required": [
+                  "items"
+                ]
+              },
+              "example": {
+                "items": [
+                  {
+                    "product_id": "amazon-us",
+                    "package_value": "50"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "invoice_id, price_usdc, price_usd, networks, expires_in_minutes, and next_step to POST /x402/invoice/pay."
+          },
+          "400": {
+            "description": "MISSING_FIELD (items) or MISSING_IDENTITY (no paying wallet)."
+          },
+          "402": {
+            "description": "Payment Required — x402 payment requirements in the PAYMENT-REQUIRED response header (and mirrored in the JSON body)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/invoice/status": {
+      "get": {
+        "operationId": "getInvoiceStatus",
+        "summary": "Invoice status and redemption codes",
+        "description": "Poll fulfillment status. Without SIWX: status only (micro-fee). With SIGN-IN-WITH-X or X-Access-Token from the paying wallet: includes redemption_info when complete.",
+        "tags": [
+          "payments"
+        ],
+        "parameters": [
+          {
+            "name": "invoice_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Invoice id returned by invoice/create."
+          },
+          {
+            "name": "PAYMENT-SIGNATURE",
+            "in": "header",
+            "required": false,
+            "description": "x402 payment payload (base64). Required to settle a 402 challenge. v1 clients may send x-payment instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SIGN-IN-WITH-X",
+            "in": "header",
+            "required": false,
+            "description": "Base64 JSON of decomposed SIWE fields (domain, address, uri, version, chainId, type, nonce, issuedAt, signature). Required on SIWX-only routes when no X-Access-Token is present.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.001"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "status, delivery_status, optional redemption_info (when SIWX-proven), optional error_code for partial fulfillment."
+          },
+          "400": {
+            "description": "Missing invoice_id."
+          },
+          "402": {
+            "description": "Payment Required — x402 payment requirements in the PAYMENT-REQUIRED response header (and mirrored in the JSON body)."
+          },
+          "403": {
+            "description": "SIWX wallet does not match invoice payer."
+          },
+          "404": {
+            "description": "Invoice not found."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/connect": {
+      "post": {
+        "operationId": "connectWallet",
+        "summary": "Mint a session token (SIWX)",
+        "description": "Sign the sign-in-with-x challenge once to obtain a reusable X-Access-Token. No micro-fee; SIWX signature is the authentication.",
+        "tags": [
+          "account"
+        ],
+        "parameters": [
+          {
+            "name": "SIGN-IN-WITH-X",
+            "in": "header",
+            "required": false,
+            "description": "Base64 JSON of decomposed SIWE fields (domain, address, uri, version, chainId, type, nonce, issuedAt, signature). Required on SIWX-only routes when no X-Access-Token is present.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "token, token_header (X-Access-Token), expires_in, and next_step to GET /x402/my/orders."
+          },
+          "402": {
+            "description": "Authentication Required — sign-in-with-x challenge in extensions[\"sign-in-with-x\"] (SIGN-IN-WITH-X header on retry)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/my/orders": {
+      "get": {
+        "operationId": "listMyOrders",
+        "summary": "List orders for the signed-in wallet",
+        "description": "Requires SIWX or X-Access-Token from the wallet that paid invoices. Returns empty list if the wallet has no agent user yet.",
+        "tags": [
+          "account"
+        ],
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "description": "Pagination offset (default 0).",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size (default 50, max 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SIGN-IN-WITH-X",
+            "in": "header",
+            "required": false,
+            "description": "Base64 JSON of decomposed SIWE fields (domain, address, uri, version, chainId, type, nonce, issuedAt, signature). Required on SIWX-only routes when no X-Access-Token is present.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "orders array (formatted order objects)."
+          },
+          "402": {
+            "description": "Authentication Required — sign-in-with-x challenge in extensions[\"sign-in-with-x\"] (SIGN-IN-WITH-X header on retry)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    },
+    "/x402/my/esims": {
+      "get": {
+        "operationId": "listMyEsims",
+        "summary": "List eSIMs for the signed-in wallet",
+        "description": "Requires SIWX or X-Access-Token. Includes active bundles and topup_options_url per eSIM.",
+        "tags": [
+          "account"
+        ],
+        "parameters": [
+          {
+            "name": "X-Access-Token",
+            "in": "header",
+            "required": false,
+            "description": "Session JWT from POST /x402/connect. Bypasses micro-fees and SIWX re-signing until expiry.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SIGN-IN-WITH-X",
+            "in": "header",
+            "required": false,
+            "description": "Base64 JSON of decomposed SIWE fields (domain, address, uri, version, chainId, type, nonce, issuedAt, signature). Required on SIWX-only routes when no X-Access-Token is present.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "esims array with iccid, product_id, and topup_options_url."
+          },
+          "402": {
+            "description": "Authentication Required — sign-in-with-x challenge in extensions[\"sign-in-with-x\"] (SIGN-IN-WITH-X header on retry)."
+          },
+          "500": {
+            "description": "Unexpected server error."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "NextStep": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Absolute URL for the next call in the checkout flow."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Suggested JSON body for a POST next step."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    }
+  }
+}
