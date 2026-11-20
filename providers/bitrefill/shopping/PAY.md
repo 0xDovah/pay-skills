@@ -24,12 +24,13 @@ the wallet. Full agent guide: https://www.bitrefill.com/agents/SKILL.md
    `GET /x402/esims/search?q=<country>` or `GET /x402/topups/search?q=<operator>`.
    Country codes are 2 capital letters (`US`, `IT`).
 3. Get the price: `GET /x402/products/detail?slug=<slug>` lists the packages and
-   whether a recipient is needed (`refill_input`: phone, email, etc.).
+   whether a recipient is needed (`recipient_required`, `recipient_type`).
 4. Prepare the order: `POST /x402/invoice/create` with
-   `{"items":[{"product_id":"<slug>","package_value":"<value>"}]}`.
+   `{"items":[{"product_id":"<slug>","package_value":"<value>"}]}`. When a
+   recipient is needed, add `refill_input` (phone number, email, etc.) to the item.
    `package_value` is the exact string from `packages[].package_value`: `"10"`
    for gift cards and top-ups, `"1GB, 7 Days"` for eSIMs. A wrong value returns
-   HTTP 500, with no charge. The reply has `invoice_id`, `price_usdc`,
+   400 `INVALID_PACKAGE`. The reply has `invoice_id`, `price_usdc`,
    `price_usd` and `expires_in_minutes`. An expired invoice can't be paid:
    create a new one.
 5. Confirm with the user: product, amount, top-up recipient and the exact USDC
@@ -38,16 +39,17 @@ the wallet. Full agent guide: https://www.bitrefill.com/agents/SKILL.md
    equal the confirmed total.
 7. Poll `GET /x402/invoice/status?invoice_id=<id>` until `delivery_status` is
    `all_delivered`. Payment is not delivery.
-8. The redemption code is in each order's `redemption_info`. Only the wallet
-   that paid can see it: if it's missing, call status again without the token,
-   so pay signs in with that wallet.
+8. Each order's `redemption_info` holds its code or redemption `link`. Only the
+   wallet that paid can see it: if it's missing, call status again without the
+   token, so pay signs in with that wallet.
 
 ## Good to know
 
 - The pay call (step 6) is not in pay's catalog, because its price is the
   invoice amount. Call it with `pay curl`.
-- `INVOICE_NOT_PAYABLE` from the pay call means the invoice is already paid:
-  poll status.
+- Send the pay call once. If unsure it went through, check status before paying
+  again: status answers 403 until the invoice is paid, and a pay call on a paid
+  invoice asks for the full amount again.
 - Signed in, `GET /x402/my/orders` and `GET /x402/my/esims` list the wallet's
   orders and eSIMs.
 - Not delivered after 3 hours? Go to https://help.bitrefill.com.
